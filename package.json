@@ -1,0 +1,14 @@
+{
+  "name": "divernote-resume",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Continue a Claude Code or Pi conversation in a Divernote issue.",
+  "divernote": {
+    "extensions": [
+      "index.mjs"
+    ]
+  },
+  "scripts": {
+    "test": "node --test import.test.mjs"
+  }
+}
