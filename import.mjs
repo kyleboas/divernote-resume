@@ -6,7 +6,8 @@ import { lstat, mkdir, open, readdir, readFile, rename, rm } from 'node:fs/promi
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 
-const SOURCE_LIMIT = 64 * 1024 * 1024;
+// The session is copied through memory, so it is bounded, well past any real session.
+const SOURCE_LIMIT = 1024 * 1024 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const REFERENCE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
@@ -37,7 +38,9 @@ async function regularFile(path) {
   const info = await lstat(path).catch(() => undefined);
   if (!info?.isFile() || info.isSymbolicLink()) return false;
   const uid = typeof process.getuid === 'function' ? process.getuid() : undefined;
-  return (uid === undefined || info.uid === uid) && info.size <= SOURCE_LIMIT;
+  if (uid !== undefined && info.uid !== uid) return false;
+  if (info.size > SOURCE_LIMIT) throw new Error(`The session is ${Math.ceil(info.size / (1024 * 1024))} MB; one over ${SOURCE_LIMIT / (1024 * 1024)} MB cannot be moved.`);
+  return true;
 }
 
 async function fileNamed(directory, matches) {
