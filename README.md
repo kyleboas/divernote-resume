@@ -33,7 +33,7 @@ ln -sf "$P/agents/divernote.ts" ~/.pi/agent/extensions/divernote-move.ts
 From a shell, the same move is:
 
 ```bash
-divernote pi-move --from <claude|pi> --source <session-id-or-path> [--project <slug>] [--title <text>] [--json]
+divernote pi-move --from <claude|pi> --source <session-id-or-path> [--project <id-or-slug-or-name>] [--title <text>] [--json]
 ```
 
 Needs a Divernote whose extension commands get `prepareIssue` and `addIssue`.

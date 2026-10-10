@@ -48,9 +48,9 @@ async function claudeHome(content) {
   return home;
 }
 
-function fakeDivernote(calls) {
-  const project = { id: 'project-1', slug: 'app', name: 'App' };
-  const client = { readProjects: async () => ({ projects: [project] }), close: async () => { calls.push('close'); } };
+function fakeDivernote(calls, projects = [{ id: 'project-1', slug: 'app', name: 'App' }]) {
+  const project = projects[0];
+  const client = { readProjects: async () => ({ projects }), close: async () => { calls.push('close'); } };
   return {
     project,
     divernote: {
@@ -106,6 +106,46 @@ test('a project and title can be named, and a failed import files no issue', asy
     env, divernote, importSession: async () => { throw new Error('The issue already has a conversation.'); },
   }), /already has a conversation/);
   assert.equal(calls.some(call => call[0] === 'add'), false);
+});
+
+test('a renamed project moves by display name, ID, or durable slug without changing its identity', async () => {
+  const home = await claudeHome(`${line({ type: 'user', cwd: '/code/app', message: { role: 'user', content: 'fix export' } })}\n`);
+  const project = { id: 'project-1', slug: 'sporting-director', name: 'Libero' };
+  for (const reference of ['libero', 'Libero', 'LIBERO', project.id, project.slug]) {
+    const calls = [];
+    const { divernote } = fakeDivernote(calls, [project]);
+    let output = '';
+    await runPiMoveCli(['--from', 'claude', '--source', CLAUDE_ID, reference, '--json'], {
+      env: { HOME: home }, divernote, stdout: text => { output += text; },
+      importSession: async ({ project: selected, agent }) => {
+        assert.equal(selected, project);
+        return { agent, cwd: '/wt/sporting-director/issue-9' };
+      },
+    });
+    assert.equal(JSON.parse(output).project, 'sporting-director');
+    assert.ok(calls.some(call => call[0] === 'add' && call[1] === project.id));
+  }
+});
+
+test('ambiguous names fail before importing, while exact stable references take precedence', async () => {
+  const home = await claudeHome(`${line({ type: 'user', message: { role: 'user', content: 'fix export' } })}\n`);
+  const projects = [
+    { id: 'project-1', slug: 'sporting-director', name: 'Libero' },
+    { id: 'project-2', slug: 'other', name: 'LIBERO' },
+  ];
+  const calls = [];
+  const { divernote } = fakeDivernote(calls, projects);
+  const args = ['--from', 'claude', '--source', CLAUDE_ID, '--project', 'libero'];
+  await assert.rejects(runPiMoveCli(args, { env: { HOME: home }, divernote }), /More than one project is called "libero"/);
+  assert.deepEqual(calls, ['close']);
+  projects[0].slug = 'libero';
+  await runPiMoveCli(args, {
+    env: { HOME: home }, divernote, stdout: () => {},
+    importSession: async ({ project, agent }) => {
+      assert.equal(project, projects[0]);
+      return { agent, cwd: '/wt/libero/issue-9' };
+    },
+  });
 });
 
 test('outside a session the source must be given', async () => {
