@@ -1,5 +1,5 @@
 // Moving a conversation that is open right now into a new Divernote issue:
-//   divernote pi-move --from <claude|pi> [--source <session-id-or-path>] [--project <slug>] [--title <text>] [--json]
+//   divernote pi-move --from <claude|pi> [--source <session-id-or-path>] [--project <id-or-slug-or-name>] [--title <text>] [--json]
 // The issue is filed in review, so the worker leaves it alone until the user
 // sends it a message, and the next run resumes the moved conversation.
 
@@ -11,7 +11,7 @@ import { promisify } from 'node:util';
 import { findSessionSource, importAgentSession, IMPORT_AGENTS } from './import.mjs';
 
 const run = promisify(execFile);
-const USAGE = 'Usage: divernote pi-move --from <claude|pi> [--source <session-id-or-path>] [--project <slug>] [--title <text>] [--json]';
+const USAGE = 'Usage: divernote pi-move --from <claude|pi> [--source <session-id-or-path>] [--project <id-or-slug-or-name>] [--title <text>] [--json]';
 const TITLE_LIMIT = 120;
 
 function parseOptions(argv) {
@@ -134,7 +134,16 @@ export async function runPiMoveCli(argv, {
     const projects = Array.isArray(data?.projects) ? data.projects : [];
     let project;
     if (options.project !== undefined) {
-      project = projects.find(item => item?.slug === options.project);
+      // Prefer stable references, but let the interactive command use a renamed
+      // project's display name without changing its repository/worktree slug.
+      project = projects.find(item => item?.id === options.project)
+        ?? projects.find(item => item?.slug === options.project);
+      if (!project) {
+        const name = options.project.trim().toLocaleLowerCase();
+        const matches = projects.filter(item => typeof item?.name === 'string' && item.name.trim().toLocaleLowerCase() === name);
+        if (matches.length > 1) throw new Error(`More than one project is called "${options.project}". Pass --project with its ID or slug.`);
+        project = matches[0];
+      }
       if (!project) throw new Error(`No project is called "${options.project}".`);
     } else {
       project = await findProject(projects, session.cwd, { divernote, env });
