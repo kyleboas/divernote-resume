@@ -9,6 +9,6 @@
     ]
   },
   "scripts": {
-    "test": "node --test import.test.mjs handoff.test.mjs"
+    "test": "node --test import.test.mjs handoff.test.mjs move.test.mjs"
   }
 }
